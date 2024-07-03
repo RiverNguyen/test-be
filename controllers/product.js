@@ -15,7 +15,9 @@ export const create = async (req, res) => {
 
 export const getAll = async (req, res) => {
     try {
-        const products = await Product.find({}).populate("category");
+        const products = await Product.find({})
+            .populate("category")
+            .sort({ createdAt: -1 });
 
         if (products.length === 0) {
             return res
