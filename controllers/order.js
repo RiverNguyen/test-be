@@ -1,6 +1,7 @@
 import Order from "../models/order.js";
 import { StatusCodes } from "http-status-codes";
 import Cart from "../models/cart.js";
+import Product from "../models/product.js";
 
 export const createOrder = async (req, res) => {
     try {
@@ -16,6 +17,38 @@ export const createOrder = async (req, res) => {
             { $set: { products: [] } },
             { new: true }
         );
+
+        items.forEach(async (item) => {
+            const product = await Product.findById(item.productId);
+
+            if (!product) {
+                console.log("Product not found for item:", item);
+                return;
+            }
+
+            console.log("Product:", product);
+            console.log("Product countInStock:", product?.countInStock);
+            console.log("Item quantity:", item.quantity);
+
+            const productCount = Number(product.countInStock);
+            const itemQuantity = Number(item.quantity);
+
+            if (isNaN(productCount) || isNaN(itemQuantity)) {
+                console.log(
+                    "Invalid countInStock or item quantity:",
+                    productCount,
+                    itemQuantity
+                );
+                return;
+            }
+
+            const newCountInStock = productCount - itemQuantity;
+            console.log("New countInStock:", newCountInStock);
+
+            product.countInStock = newCountInStock;
+            await product.save();
+        });
+
         return res.status(StatusCodes.CREATED).json(order);
     } catch (error) {
         return res
@@ -23,6 +56,7 @@ export const createOrder = async (req, res) => {
             .json({ error: error.message });
     }
 };
+
 export const getOrders = async (req, res) => {
     try {
         const order = await Order.find();
@@ -114,16 +148,24 @@ export const updateOrderStatus = async (req, res) => {
                 .json({ error: "Order not found" });
         }
 
-        if (order.status === "đang vận chuyển" || order.status === "đã giao") {
+        // if (order.status === "đang vận chuyển" || order.status === "đã giao") {
+        //     return res.status(StatusCodes.BAD_REQUEST).json({
+        //         error: "Không thể xóa đơn hàng đã vận chuyển, đã giao",
+        //     });
+        // }
+
+        if (order.status === "đã giao") {
             return res.status(StatusCodes.BAD_REQUEST).json({
-                error: "Không thể xóa đơn hàng đã vận chuyển, đã giao",
+                error: "Không thể thay đổi trạng thái đơn hàng đã giao.",
             });
         }
+
         if (order.status === "đã huỷ") {
             return res.status(StatusCodes.BAD_REQUEST).json({
                 error: "Không thể thay đổi trạng thái đơn hàng đã huỷ",
             });
         }
+
         order.status = status;
         await order.save();
 
